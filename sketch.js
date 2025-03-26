@@ -13,6 +13,7 @@ let asteroidSpeed = 2;
 let lastShot = 0;
 let shootInterval = 10; // Frames between shots
 let tilt = 0; // Stores the accelerometer tilt value
+let motionPermissionGranted = false;
 
 const alienTypes = [
   { color: [255, 0, 0], size: 20, points: 10, move: "straight" },
@@ -24,20 +25,6 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   pixelDensity(1); // Retro pixelated look
   createStarfield();
-
-  // Request permission for motion/orientation on iOS
-  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    DeviceOrientationEvent.requestPermission()
-      .then(permissionState => {
-        if (permissionState === 'granted') {
-          window.addEventListener('deviceorientation', handleOrientation);
-        }
-      })
-      .catch(console.error);
-  } else {
-    // Non-iOS devices (e.g., Android) don’t need permission
-    window.addEventListener('deviceorientation', handleOrientation);
-  }
 }
 
 function draw() {
@@ -58,15 +45,29 @@ function draw() {
 }
 
 function touchStarted() {
-  if (gameState === "play") {
+  if (gameState === "start" || gameState === "over") {
+    // Request motion permission on first tap (iOS requirement)
+    if (!motionPermissionGranted && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(permissionState => {
+          if (permissionState === 'granted') {
+            window.addEventListener('deviceorientation', handleOrientation);
+            motionPermissionGranted = true;
+          }
+        })
+        .catch(console.error);
+    } else if (!motionPermissionGranted) {
+      // Non-iOS devices (e.g., Android)
+      window.addEventListener('deviceorientation', handleOrientation);
+      motionPermissionGranted = true;
+    }
+    startGame();
+  } else if (gameState === "play") {
     // Shoot on tap
     if (frameCount - lastShot > shootInterval) {
       bullets.push(new Bullet(player.x + 10, player.y));
       lastShot = frameCount;
     }
-  } else if (gameState === "start" || gameState === "over") {
-    // Start or restart on tap
-    startGame();
   }
   return false; // Prevent default behavior
 }
@@ -123,7 +124,6 @@ function showStartScreen() {
   text("Tap to Start", width / 2, height / 2 + 20);
   text("Tap for Info", width / 2, height / 2 + 50);
   
-  // Check touches for info
   for (let touch of touches) {
     if (touch.y > height / 2 + 30 && touch.y < height / 2 + 70) {
       gameState = "instructions";
@@ -143,7 +143,6 @@ function showInstructions() {
   text("Avoid aliens and asteroids", width / 2, height / 2 + 40);
   text("Tap to go back", width / 2, height / 2 + 100);
   
-  // Check touches to go back
   for (let touch of touches) {
     if (touch.y > height / 2 + 80 && touch.y < height / 2 + 120) {
       gameState = "start";
@@ -162,7 +161,6 @@ function showGameOver() {
   text("Tap to Restart", width / 2, height / 2 + 20);
   text("Tap to Share", width / 2, height / 2 + 50);
   
-  // Check touches for share
   for (let touch of touches) {
     if (touch.y > height / 2 + 30 && touch.y < height / 2 + 70) {
       shareScore();
