@@ -14,6 +14,8 @@ let lastShot = 0;
 let shootInterval = 10; // Frames between shots
 let tilt = 0; // Stores the accelerometer tilt value
 let motionPermissionGranted = false;
+let touchX = null; // Add this with other global variables
+let isShooting = false; // Add this with other global variables
 
 const alienTypes = [
   { color: [255, 0, 0], size: 20, points: 10, move: "straight" },
@@ -63,13 +65,59 @@ function touchStarted() {
     }
     startGame();
   } else if (gameState === "play") {
-    // Shoot on tap
-    if (frameCount - lastShot > shootInterval) {
-      bullets.push(new Bullet(player.x + 10, player.y));
-      lastShot = frameCount;
+    // Handle multiple touches
+    for (let touch of touches) {
+      // Left side of screen controls movement
+      if (touch.x < width/2) {
+        touchX = touch.x;
+      }
+      // Right side of screen controls shooting
+      else {
+        isShooting = true;
+      }
     }
   }
   return false; // Prevent default behavior
+}
+
+function touchMoved() {
+  if (gameState === "play") {
+    for (let touch of touches) {
+      if (touch.x < width/2) {
+        touchX = touch.x;
+      }
+    }
+  }
+  return false;
+}
+
+function touchEnded() {
+  if (gameState === "play") {
+    // Check if the movement touch was released
+    let hasMovementTouch = false;
+    for (let touch of touches) {
+      if (touch.x < width/2) {
+        hasMovementTouch = true;
+        break;
+      }
+    }
+    if (!hasMovementTouch) {
+      touchX = null;
+    }
+    
+    // Check if shooting touch was released
+    let hasShootingTouch = false;
+    for (let touch of touches) {
+      if (touch.x >= width/2) {
+        hasShootingTouch = true;
+        break;
+      }
+    }
+    if (!hasShootingTouch) {
+      isShooting = false;
+    }
+  }
+  return false;
 }
 
 function keyPressed() {
@@ -308,14 +356,28 @@ class Player {
     this.x = width / 2;
     this.y = height - 40;
     this.speed = 6;
+    this.targetX = this.x;
   }
 
   update() {
-    // Use accelerometer tilt for movement
-    this.x += tilt * 0.2; // Scale tilt for smooth control
-    // Add keyboard controls for desktop
+    // Desktop controls
     if (keyIsDown(LEFT_ARROW)) this.x -= this.speed;
     if (keyIsDown(RIGHT_ARROW)) this.x += this.speed;
+
+    // Mobile touch controls
+    if (touchX !== null) {
+      this.targetX = touchX;
+      // Smooth movement towards touch position
+      let dx = this.targetX - this.x;
+      this.x += dx * 0.2;
+    }
+
+    // Handle shooting
+    if ((keyIsDown(32) || isShooting) && frameCount - lastShot > shootInterval) {
+      bullets.push(new Bullet(this.x + 10, this.y));
+      lastShot = frameCount;
+    }
+
     // Keep player within bounds
     if (this.x < 0) this.x = 0;
     if (this.x > width - 20) this.x = width - 20;
