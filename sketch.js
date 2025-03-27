@@ -493,3 +493,191 @@ function handleIcons() {
   // Draw icons
   Object.values(icons).forEach(icon => icon.show());
 }
+
+function setupIcons() {
+  icons.info = new Icon(30, height - 30, 30, 'info');
+  icons.pause = new Icon(width - 30, 30, 30, 'pause');
+  icons.share = new Icon(width - 30, height - 30, 30, 'share');
+}
+
+function drawStarfield() {
+  stars.forEach(star => {
+    star.update();
+    star.show();
+  });
+}
+
+function showStartScreen() {
+  push();
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(48);
+  text('SPACE SHOOTER', width/2, height/3);
+  textSize(24);
+  text('Tap or Click to Start', width/2, height/2);
+  text(`High Score: ${highScore}`, width/2, height/2 + 50);
+  pop();
+}
+
+function showGameOver() {
+  push();
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(48);
+  text('GAME OVER', width/2, height/3);
+  textSize(24);
+  text(`Score: ${score}`, width/2, height/2);
+  text(`High Score: ${highScore}`, width/2, height/2 + 40);
+  text('Tap or Click to Restart', width/2, height/2 + 80);
+  pop();
+}
+
+function playGame() {
+  player.update();
+  player.show();
+  
+  // Update and show bullets
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    bullets[i].update();
+    bullets[i].show();
+    if (bullets[i].offscreen()) {
+      bullets.splice(i, 1);
+    }
+  }
+  
+  // Update and show enemies
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    enemies[i].update();
+    enemies[i].show();
+    
+    if (enemies[i].hits(player)) {
+      health--;
+      spawnParticles(enemies[i].x, enemies[i].y, enemies[i].color);
+      enemies.splice(i, 1);
+      if (health <= 0) {
+        gameState = "over";
+        if (score > highScore) {
+          highScore = score;
+          setCookie('highScore', highScore);
+        }
+      }
+      continue;
+    }
+    
+    if (enemies[i].offscreen()) {
+      enemies.splice(i, 1);
+      continue;
+    }
+    
+    // Check bullet collisions
+    for (let j = bullets.length - 1; j >= 0; j--) {
+      if (enemies[i] && bullets[j].hits(enemies[i])) {
+        score += enemies[i].type.points;
+        spawnParticles(enemies[i].x, enemies[i].y, enemies[i].color);
+        enemies.splice(i, 1);
+        bullets.splice(j, 1);
+        break;
+      }
+    }
+  }
+  
+  handleEnemyBullets();
+  
+  // Start new level if all enemies are destroyed
+  if (enemies.length === 0) {
+    startNewLevel();
+  }
+}
+
+function handleParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update();
+    particles[i].show();
+    if (particles[i].isDead()) {
+      particles.splice(i, 1);
+    }
+  }
+}
+
+function spawnParticles(x, y, color) {
+  for (let i = 0; i < 10; i++) {
+    particles.push(new Particle(x, y, color));
+  }
+}
+
+function mousePressed() {
+  if (gameState === "start") {
+    startGame();
+  } else if (gameState === "over") {
+    resetGame();
+  }
+}
+
+function startGame() {
+  gameState = "play";
+  player = new Player();
+  enemies = [];
+  bullets = [];
+  enemyBullets = [];
+  level = 1;
+  score = 0;
+  health = 3;
+  spawnEnemies();
+}
+
+function resetGame() {
+  startGame();
+}
+
+function handleUITouches() {
+  // Handle icon clicks
+  if (icons.info.isClicked(mouseX, mouseY)) {
+    // Show instructions
+    console.log("Show instructions");
+  } else if (icons.pause.isClicked(mouseX, mouseY)) {
+    isPaused = !isPaused;
+  } else if (icons.share.isClicked(mouseX, mouseY) && gameState === "over") {
+    // Share score
+    const shareText = `I scored ${score} points in Space Shooter!`;
+    if (navigator.share) {
+      navigator.share({
+        title: 'Space Shooter Score',
+        text: shareText,
+        url: window.location.href
+      });
+    }
+  }
+}
+
+// Add Bullet class
+class Bullet {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.speed = 7;
+    this.size = 8;
+  }
+
+  update() {
+    this.y -= this.speed;
+  }
+
+  show() {
+    push();
+    fill(0, 255, 200);
+    noStroke();
+    rect(this.x - 2, this.y, 4, 10);
+    pop();
+  }
+
+  hits(enemy) {
+    return collideRectRect(
+      this.x - 2, this.y, 4, 10,
+      enemy.x, enemy.y, enemy.size, enemy.size
+    );
+  }
+
+  offscreen() {
+    return this.y < 0;
+  }
+}
