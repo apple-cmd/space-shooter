@@ -6,6 +6,7 @@ let enemyBullets = [];
 let stars = [];
 let particles = [];
 let level = 1;
+
 let score = 0;
 let health = 3;
 let gameState = "start";
